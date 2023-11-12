@@ -18,8 +18,17 @@ class Game:
         self.tasks_to_win = tasks_to_win
         self.imposter_count = imposter_count
     
-    def send_roles():
-        pass
+    async def send_roles(self):
+        for player in self.players:
+            await player.send("You are a crewmate")
+        print("sent roles")
+    
+    def add_player(self, player):
+        self.players.append(player)
+
+    def start_timer(self):
+        # start 7 min python timer
+        print("timer started")
 
 # Helper functions
 def get_people():
@@ -66,6 +75,8 @@ async def on_ready():
 # meeting
 # task counter
 # reset game
+
+game = Game()
 
 @client.event
 async def on_message(message):
