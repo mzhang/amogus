@@ -33,6 +33,12 @@ class Game:
     def start_timer(self):
         # start 7 min python timer
         print("timer started")
+    
+    def start_game(self):
+        # send roles
+        # start timer
+        print("game started")
+        self.send_roles()
 
 
 def get_tasks():
@@ -72,15 +78,25 @@ async def on_ready():
 # task counter
 # reset game
 
-game = Game()
+game = Game(10, 4, 2)
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
 
-    if message.content.startswith('.getRole'):
-        await message.channel.send('Hello!')
+    if message.content.startswith('.getroles'):
+        game.add_player(message.author)
+        await message.channel.send('Added you!')
+
+
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
+    if message.content.startswith('.startgame'):
+        game.start_game()
+
     
 
 client.run(os.getenv("SECRET_TOKEN"))
