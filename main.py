@@ -1,6 +1,8 @@
 import discord
 import os
 import random
+import asyncio
+import time
 from dotenv import load_dotenv
 from discord.ext import commands
 
@@ -10,15 +12,29 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='.', intents=intents)
+bot = commands.Bot(command_prefix=".", intents=intents)
 
-#amogus discord bot
-class Game: 
+
+# amogus discord bot
+class Game:
     def __init__(self, tasks_to_win, imposter_count):
         self.players = []
         self.tasks_to_win = tasks_to_win
         self.imposter_count = imposter_count
-    
+
+    async def _timer(self):
+        print("here")
+        while self.timer > 0:
+            print("here")
+            await asyncio.sleep(1)
+            if self.timer_running:
+                self.timer -= 1
+
+            print(f"Time left: {self.timer} seconds")
+
+        if self.timer == 0:
+            print("Game over - time ran out!")
+
     async def send_roles(self):
         imposters = random.sample(self.players, self.imposter_count)
         imposter_names = []
@@ -27,41 +43,43 @@ class Game:
 
         for player in self.players:
             if player in imposters:
-                print("imposter")
-                await player.send(f"You are an imposter. All the imposters are {imposter_names}")
+                await player.send(
+                    f"You are an imposter. All the imposters are {imposter_names}"
+                )
             else:
-                print("crew")
 
                 await player.send("You are a crewmate.")
         print("sent roles")
-    
+
     def add_player(self, player):
         self.players.append(player)
 
     def emergency(self):
         # Pause the timer
+        self.timer_running = False
         print("emergency started")
 
-    def meeting(self):
+    def meeting(self, ctx):
         # start 1 min python timer
-        print("meeting started")
-    
-    def resume(self):
-        # Decrement timer by 1 every second
+        self.meeting_timer = 60
+        while self.meeting_timer > 0:
+            self.meeting_timer -= 1
+            if self.meeting_timer % 10 == 0:
+                ctx.send(f"Meeting time left: {self.meeting_timer} seconds")
+            time.sleep(1)
 
-        # If timer is 0, end game
+    def resume(self):
+        self.timer_running = True
         print("game resumed")
 
-        
-        
-    
     async def start_game(self):
-        # send roles
-        # init timer to 7 minutes
-        self.timer = 7 * 60
-
         print("game started")
         await self.send_roles()
+
+        # init timer to 7 minutes
+        self.timer = 7 * 60
+        self.timer_running = False
+        asyncio.run(self._timer())
 
 
 def get_tasks():
@@ -90,6 +108,7 @@ def get_tasks():
 
     return [easy_task, medium_task, hard_task, random_task]
 
+
 # sign up for next game
 # start game
 #    - start timer
@@ -103,13 +122,14 @@ game = None
 @bot.command()
 async def start(ctx):
     global game
-    
+
     if game is None:
         print("game is none")
         return
-    
+
     ctx.send("Game started!")
     await game.start_game()
+
 
 @bot.command()
 async def signup(ctx):
@@ -121,6 +141,7 @@ async def signup(ctx):
 
     game.add_player(ctx.author)
     await ctx.send("Added you!")
+
 
 @bot.command()
 async def reset(ctx):
@@ -134,22 +155,26 @@ async def reset(ctx):
     game = Game(tasks, imposters)
     await ctx.send("Game reset!")
 
+
 @bot.command()
 async def emergency(ctx):
     global game
     game.emergency()
     await ctx.send("@everyone Emergency meeting called!")
 
+
 @bot.command()
 async def meeting(ctx):
     global game
-    game.meeting()
+    game.meeting(ctx)
     await ctx.send("Meeting timer started!")
+
 
 @bot.command()
 async def resume(ctx):
     global game
     game.resume()
     await ctx.send("Game resumed!")
+
 
 bot.run(os.getenv("SECRET_TOKEN"))
