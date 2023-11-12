@@ -2,6 +2,7 @@ import discord
 import os
 import random
 from dotenv import load_dotenv
+from discord.ext import commands
 
 # Do some setup
 load_dotenv()
@@ -9,7 +10,7 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord.Client(intents=intents)
+bot = commands.Bot(command_prefix='.', intents=intents)
 
 #amogus discord bot
 class Game: 
@@ -20,25 +21,47 @@ class Game:
     
     async def send_roles(self):
         imposters = random.sample(self.players, self.imposter_count)
+        imposter_names = []
+        for imposter in imposters:
+            imposter_names.append(imposter.name)
+
         for player in self.players:
             if player in imposters:
-                await player.send(f"You are an imposter. All the imposters are {imposters}")
+                print("imposter")
+                await player.send(f"You are an imposter. All the imposters are {imposter_names}")
             else:
+                print("crew")
+
                 await player.send("You are a crewmate.")
         print("sent roles")
     
     def add_player(self, player):
         self.players.append(player)
 
-    def start_timer(self):
-        # start 7 min python timer
-        print("timer started")
+    def emergency(self):
+        # Pause the timer
+        print("emergency started")
+
+    def meeting(self):
+        # start 1 min python timer
+        print("meeting started")
     
-    def start_game(self):
+    def resume(self):
+        # Decrement timer by 1 every second
+
+        # If timer is 0, end game
+        print("game resumed")
+
+        
+        
+    
+    async def start_game(self):
         # send roles
-        # start timer
+        # init timer to 7 minutes
+        self.timer = 7 * 60
+
         print("game started")
-        self.send_roles()
+        await self.send_roles()
 
 
 def get_tasks():
@@ -67,10 +90,6 @@ def get_tasks():
 
     return [easy_task, medium_task, hard_task, random_task]
 
-@client.event
-async def on_ready():
-    print(f'We have logged in as {client.user}')
-
 # sign up for next game
 # start game
 #    - start timer
@@ -78,25 +97,59 @@ async def on_ready():
 # task counter
 # reset game
 
-game = Game(10, 4, 2)
-
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
-
-    if message.content.startswith('.getroles'):
-        game.add_player(message.author)
-        await message.channel.send('Added you!')
+game = None
 
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
-    if message.content.startswith('.startgame'):
-        game.start_game()
-
+@bot.command()
+async def start(ctx):
+    global game
     
+    if game is None:
+        print("game is none")
+        return
+    
+    ctx.send("Game started!")
+    await game.start_game()
 
-client.run(os.getenv("SECRET_TOKEN"))
+@bot.command()
+async def signup(ctx):
+    global game
+
+    if game is None:
+        print("game is none")
+        return
+
+    game.add_player(ctx.author)
+    await ctx.send("Added you!")
+
+@bot.command()
+async def reset(ctx):
+    global game
+
+    # Get the specified number of tasks/imposters from the message
+    split_message = ctx.message.content.split(" ")
+    tasks = int(split_message[1])
+    imposters = int(split_message[2])
+
+    game = Game(tasks, imposters)
+    await ctx.send("Game reset!")
+
+@bot.command()
+async def emergency(ctx):
+    global game
+    game.emergency()
+    await ctx.send("@everyone Emergency meeting called!")
+
+@bot.command()
+async def meeting(ctx):
+    global game
+    game.meeting()
+    await ctx.send("Meeting timer started!")
+
+@bot.command()
+async def resume(ctx):
+    global game
+    game.resume()
+    await ctx.send("Game resumed!")
+
+bot.run(os.getenv("SECRET_TOKEN"))
