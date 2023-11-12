@@ -23,14 +23,12 @@ class Game:
         self.imposter_count = imposter_count
 
     async def _timer(self):
-        print("here")
         while self.timer > 0:
-            print("here")
             await asyncio.sleep(1)
             if self.timer_running:
                 self.timer -= 1
-
-            print(f"Time left: {self.timer} seconds")
+            if self.timer % 60 == 0:
+                print(f"Time left: {self.timer} seconds")            
 
         if self.timer == 0:
             print("Game over - time ran out!")
@@ -79,7 +77,7 @@ class Game:
         # init timer to 7 minutes
         self.timer = 7 * 60
         self.timer_running = False
-        asyncio.run(self._timer())
+        await self._timer()
 
 
 def get_tasks():
@@ -107,14 +105,6 @@ def get_tasks():
     random_task = random.choice(tasks)
 
     return [easy_task, medium_task, hard_task, random_task]
-
-
-# sign up for next game
-# start game
-#    - start timer
-# meeting
-# task counter
-# reset game
 
 game = None
 
@@ -152,7 +142,7 @@ async def reset(ctx):
     tasks = int(split_message[1])
     imposters = int(split_message[2])
 
-    game = Game(tasks, imposters)
+    game = Game(tasks, imposters, ctx)
     await ctx.send("Game reset!")
 
 
@@ -175,6 +165,5 @@ async def resume(ctx):
     global game
     game.resume()
     await ctx.send("Game resumed!")
-
 
 bot.run(os.getenv("SECRET_TOKEN"))
