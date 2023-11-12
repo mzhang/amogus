@@ -1,7 +1,15 @@
 import discord
 import os
+import random
 from dotenv import load_dotenv
+
+# Do some setup
 load_dotenv()
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+client = discord.Client(intents=intents)
 
 #amogus discord bot
 class Game: 
@@ -13,10 +21,40 @@ class Game:
     def send_roles():
         pass
 
-intents = discord.Intents.default()
-intents.message_content = True
+# Helper functions
+def get_people():
+    people_emails = []
+    with open("people.txt", "r") as f:
+        for line in f:
+            people_emails.append(line.strip())
 
-client = discord.Client(intents=intents)
+    return people_emails
+
+def get_tasks():
+    # Returns 4 tasks, one easy, one medium, one hard, and one random
+    easy_tasks = []
+    medium_tasks = []
+    hard_tasks = []
+    with open("easy.txt", "r") as f:
+        for line in f:
+            easy_tasks.append(line.strip())
+
+    with open("medium.txt", "r") as f:
+        for line in f:
+            medium_tasks.append(line.strip())
+
+    with open("hard.txt", "r") as f:
+        for line in f:
+            hard_tasks.append(line.strip())
+
+    tasks = easy_tasks + medium_tasks + hard_tasks
+
+    easy_task = random.choice(easy_tasks)
+    medium_task = random.choice(medium_tasks)
+    hard_task = random.choice(hard_tasks)
+    random_task = random.choice(tasks)
+
+    return [easy_task, medium_task, hard_task, random_task]
 
 @client.event
 async def on_ready():
@@ -36,5 +74,6 @@ async def on_message(message):
 
     if message.content.startswith('.getRole'):
         await message.channel.send('Hello!')
+    
 
 client.run(os.getenv("SECRET_TOKEN"))
