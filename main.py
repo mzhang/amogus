@@ -13,14 +13,18 @@ client = discord.Client(intents=intents)
 
 #amogus discord bot
 class Game: 
-    def __init__(self, players, tasks_to_win, imposter_count):
-        self.players = players
+    def __init__(self, tasks_to_win, imposter_count):
+        self.players = []
         self.tasks_to_win = tasks_to_win
         self.imposter_count = imposter_count
     
     async def send_roles(self):
+        imposters = random.sample(self.players, self.imposter_count)
         for player in self.players:
-            await player.send("You are a crewmate")
+            if player in imposters:
+                await player.send(f"You are an imposter. All the imposters are {imposters}")
+            else:
+                await player.send("You are a crewmate.")
         print("sent roles")
     
     def add_player(self, player):
@@ -30,14 +34,6 @@ class Game:
         # start 7 min python timer
         print("timer started")
 
-# Helper functions
-def get_people():
-    people_emails = []
-    with open("people.txt", "r") as f:
-        for line in f:
-            people_emails.append(line.strip())
-
-    return people_emails
 
 def get_tasks():
     # Returns 4 tasks, one easy, one medium, one hard, and one random
