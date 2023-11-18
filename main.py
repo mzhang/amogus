@@ -10,7 +10,7 @@ intents.message_content = True
 
 # amogus discord bot
 # handles timer logic and any interface with discord
-class MyClient(commands.Bot):
+class MyClient(discord.Bot):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -77,7 +77,6 @@ class MyClient(commands.Bot):
     @tasks.loop(seconds=1)
     async def timer(self):
         if self.game is not None and self.game.is_ended:
-            await self.channel.send("@everyone Game has ended! Please return to the meeting room!")
             self.game = None
             return
         if self.game is None or self.channel is None:
@@ -85,39 +84,31 @@ class MyClient(commands.Bot):
         
         await self.game.decrement_timer(
             lambda: self.channel.send(f"Crewmates have {self.game.timer} seconds left to finish {self.game.remaining_tasks} tasks!"),
-            lambda: self.channel.send(f"@everyone The meeting is over! Vote for who you think the imposter is!"),
-            lambda: self.channel.send(f"@everyone Crewmates have {self.game.timer}s to finish {self.game.remaining_tasks} tasks!")
+            lambda: self.channel.send(f"@ everyone The meeting is over! Vote for who you think the imposter is!"),
+            lambda: self.channel.send(f"@ everyone Crewmates have {self.game.timer}s to finish {self.game.remaining_tasks} tasks!")
         )
 
     def add_commands(self):
-        @self.command(name="new", pass_context=True)
-        async def newGame(ctx, *args):
-            usage = "Usage: .new <tasks to win> <imposters> <tasks per person = 4> <game length(seconds) = 420> <meeting length(seconds) = 60>"
-            if not 2 <= len(args) <= 5:
-                await ctx.send(usage)
-                return
-            tasks_to_win = int(args[0])
-            imposter_count = int(args[1])
-            tasks_per_person = 4 if len(args) < 3 else int(args[2])
-            game_length = 420 if len(args) < 4 else int(args[3])
-            meeting_length = 50 if len(args) < 5 else int(args[4])
+        @self.command(name="new", description="Create a new game.", pass_context=True)
+        async def newGame(ctx, tasks_to_win: int, imposter_count: int, tasks_per_person: discord.Option(int), game_length: discord.Option(int), meeting_length: discord.Option(int)):
             self.game = Game(tasks_to_win, imposter_count, tasks_per_person, game_length, meeting_length)
-            self.channel = ctx.message.channel
+            self.channel = ctx.channel
             self.load_tasks()
             
-            await ctx.send(f"New game created with {tasks_to_win} tasks to win, {imposter_count} imposters!")
+            await ctx.respond(f"New game created with {tasks_to_win} tasks to win, {imposter_count} imposters! The game will last {game_length} seconds, and meetings will last {meeting_length} seconds!")
 
         @self.check_game_existence
         @self.command()
         async def join(ctx):
+            #TODO: prevent duplicate players
             self.players.append(ctx.author)
-            await ctx.send(f"Added {ctx.author.name} to the game!")
+            await ctx.respond(f"Added {ctx.author.name} to the game!")
 
         @self.check_game_existence
         @self.command(name="start", pass_context=True)
         async def startGame(ctx):
             if len(self.players) < self.game.imposter_count:
-                await ctx.send(f"We can't start the game yet - {len(self.players)} players have joined, but we need at least {self.game.imposter_count} players to be imposters!")
+                await ctx.respond(f"We can't start the game yet - {len(self.players)} players have joined, but we need at least {self.game.imposter_count} players to be imposters!")
                 return
             imposters = self.game.get_imposters(self.players)
             imposter_names = "\n".join([imposter.name for imposter in imposters])
@@ -128,46 +119,43 @@ class MyClient(commands.Bot):
                 await player.send(role_message + "\n\n" + task_message)
 
             self.game.start_game()
-            await ctx.send(f"Game has started! Crewmates have {self.game.timer}s to finish {self.game.remaining_tasks} tasks!")
+            await ctx.respond(f"Game has started! Crewmates have {self.game.timer}s to finish {self.game.remaining_tasks} tasks!")
         
         @self.check_game_existence
-        @self.command()
+        @self.command(name="emergency", pass_context=True)
         async def emergency(ctx):
             self.game.emergency()
-            await ctx.send("@everyone Emergency meeting called! Drop what you're doing and go to the meeting room ASAP!")
+            await ctx.respond("@ everyone Emergency meeting called! Drop what you're doing and go to the meeting room ASAP!")
 
         @self.check_game_existence
         @self.command(name="meeting", pass_context=True)
         async def start_meeting(ctx):
             self.game.start_meeting()
-            await ctx.send(f"@everyone The meeting has started! Crewmates have {self.game.meeting_timer} seconds to discuss!")
+            await ctx.respond(f"@ everyone The meeting has started! Crewmates have {self.game.meeting_timer} seconds to discuss!")
         
         @self.check_game_existence
         @self.command(name="meetingdone", pass_context=True)
         async def resume_game(ctx):
             self.game.resume_game()
-            await ctx.send(f"@everyone Timer resumed! Crewmates have {self.game.timer} seconds to finish {self.game.remaining_tasks} tasks!")
+            await ctx.respond(f"@ everyone Timer resumed! Crewmates have {self.game.timer} seconds to finish {self.game.remaining_tasks} tasks!")
 
         @self.check_game_existence
-        @self.command(name="task", pass_context=True)
-        async def done_task(ctx, *args):
-            if len(args) < 1:
-                await ctx.send("Write 2-3 sentences about what you did to finish the task!")
-                return
-
+        @self.command(name="task", description="Write 2-3 sentences about what you did to finish the task!", pass_context=True)
+        async def done_task(ctx, task_writeup: str):
             self.game.done_task()
             if self.game.remaining_tasks == 0:
-                await ctx.send(f"Crewmates have finished all their tasks!")
-            await ctx.send(f"{ctx.author.name} has finished a task! Crewmates have {self.game.remaining_tasks} tasks left to finish!")
+                await ctx.respond(f"Crewmates have finished all their tasks!")
+            await ctx.respond(f"{ctx.author.name} has finished a task! {ctx.author.name} wrote: \"{task_writeup}\". Crewmates have {self.game.remaining_tasks} tasks left to finish!")
 
         @self.check_game_existence
         @self.command(name="end", pass_context=True)
         async def end_game(ctx):
             self.game.end_game()
+            await ctx.respond(f"@ everyone Game has ended! Please return to the meeting room!")
 
         @self.command(name="commands", pass_context=True)
         async def commands(ctx):
-            await ctx.send(
+            await ctx.respond(
                 """```\n
                 Commands:
                 .new -> create a new game
@@ -185,7 +173,7 @@ class MyClient(commands.Bot):
         
         @self.command(name="rules", pass_context=True)
         async def rules(ctx):
-            await ctx.send(
+            await ctx.respond(
                 """```\n
                 Rules:
                 1. only imposter can run or open doors (to use staircases or elevators)
@@ -229,6 +217,7 @@ class Game:
             if self.meeting_timer == 0:
                 self.end_meeting()
                 await meeting_over_callback()
+                #TODO: bug, game timer is never restarted after a meeting.
         else:
             self.timer -= 1
             if self.timer == 0:
@@ -246,6 +235,7 @@ class Game:
         self.timer_running = False
 
     def start_meeting(self):
+        #TODO: bug, meeting timer info gets overwritten after first meeting.
         self.timer_running = True
         self.in_meeting = True
     
@@ -269,5 +259,5 @@ class Game:
             self.end_game()
             return
 
-bot = MyClient(command_prefix=".", intents=intents)
+bot = MyClient(intents=intents)
 bot.run(os.getenv("SECRET_TOKEN"))
