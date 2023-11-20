@@ -48,6 +48,7 @@ class Executor(discord.Bot):
                 self.hard_tasks.append(line.strip())
         
         self.add_commands()
+        self.timer.start()
             
     def get_player_tasks(self):
         tasks = set()
@@ -55,11 +56,11 @@ class Executor(discord.Bot):
 
         # add equal number of tasks from each difficulty when possible
         if num_tasks >= 3:
-            tasks.add(random.sample(self.easy_tasks, num_tasks // 3))
-            tasks.add(random.sample(self.medium_tasks, num_tasks // 3))
-            tasks.add(random.sample(self.hard_tasks, num_tasks // 3))
+            tasks.update(random.sample(self.easy_tasks, num_tasks // 3))
+            tasks.update(random.sample(self.medium_tasks, num_tasks // 3))
+            tasks.update(random.sample(self.hard_tasks, num_tasks // 3))
         
-        while(tasks.size() < num_tasks):
+        while(len(tasks) < num_tasks):
             #add task of random difficulty to fill out rest of tasks
             difficulty = random.randint(0, 2)
             if difficulty == 0:
@@ -75,28 +76,29 @@ class Executor(discord.Bot):
     async def timer(self):
         if self.state == State.IN_PROGRESS:
             self.game_time -= 1
+            print("game time:", self.game_time)
             
             if self.game_time % 60 == 0 or self.game_time < 10:
                 await self.channel.send(f"Crewmates have {self.game_time}s left to finish {self.remaining_tasks} tasks!")
             
             if self.game_time == 0:
-                self.change_presence(None)
-                await self.end()
+                await self.end_game()
                 return
             
-            await self.change_presence(activity=discord.Game(name=f"{self.game_time}s left"))
         elif self.state == State.MEETING:
             self.meeting_time -= 1
+            print("meeting time:", self.meeting_time)
 
             if self.meeting_time == 0:
-                self.change_presence(None)
                 await self.channel.send("@everyone The meeting has ended! Vote out who you think is the imposter.")
                 return
-            
-            await self.change_presence(activity=discord.Game(name=f"{self.meeting_time}s left"))
-    
+
     def add_commands(self):
-        @self.command(name="new", description="Start a new game")
+        @self.command()
+        async def test(ctx): 
+            await ctx.respond("test")
+    
+        @self.command(description="Start a new game")
         async def new_game(ctx, 
                             tasks_to_win: int, 
                             imposter_count: int, 
@@ -125,7 +127,7 @@ class Executor(discord.Bot):
                 return
         
             self.players.add(ctx.author)
-            await ctx.respond(f"Added {ctx.author.name} to the game!")
+            await ctx.respond(f"Added {ctx.author.name} to the game! {len(self.players)} players have joined so far!")
         
         @self.command(description="Start the game")
         async def start_game(ctx):
@@ -133,23 +135,23 @@ class Executor(discord.Bot):
                 await ctx.respond("Error: Game has not been created yet!")
                 return
             
-            if len(self.players) < self.game.imposter_count:
-                await ctx.respond(f"We can't start the game yet - {len(self.players)} players have joined, but we need at least {self.game.imposter_count} players to be imposters!")
+            if len(self.players) < self.imposter_count:
+                await ctx.respond(f"We can't start the game yet - {len(self.players)} players have joined, but we need at least {self.imposter_count} players to be imposters!")
                 return
             
             self.state = State.IN_PROGRESS
 
-            imposters = random.sample(self.players, self.game.imposter_count)
+            imposters = random.sample(self.players, self.imposter_count)
             imposter_names = "\n".join([imposter.name for imposter in imposters])
 
             #distribute roles
             for player in self.players:
                 role_message = f"You are a crewmate. " if player not in imposters else f"You are an imposter. The imposters this game are: \n\n{imposter_names}"
-                tasks = self.get_tasks_for_player()
+                tasks = self.get_player_tasks()
                 task_message = "Your tasks are:\n\n" + "\n".join([f"{i+1}. {task}" for i, task in enumerate(tasks)])
                 await player.send(role_message + "\n\n" + task_message)
 
-            await ctx.respond(f"Game has started! Crewmates have {self.game.timer}s to finish {self.game.remaining_tasks} tasks!")
+            await ctx.respond(f"Game has started! Crewmates have {self.game_time}s to finish {self.remaining_tasks} tasks!")
         
         @self.command(name="task", description="Write 2-3 sentences about what you did to finish the task!")
         async def complete_task(ctx, task_writeup: str):
@@ -159,7 +161,8 @@ class Executor(discord.Bot):
             self.remaining_tasks -= 1
             if self.remaining_tasks == 0:
                 await ctx.respond(f"Crewmates have finished all their tasks!")
-            await ctx.respond(f"{ctx.author.name} has finished a task! {ctx.author.name} wrote: \"{task_writeup}\". Crewmates have {self.game.remaining_tasks} tasks left to finish!")
+                await self.end_game(ctx)
+            await ctx.respond(f"{ctx.author.name} has finished a task! {ctx.author.name} wrote: \"{task_writeup}\". Crewmates have {self.remaining_tasks} tasks left to finish!")
         
         @self.command(description="Call an emergency meeting")
         async def emergency(ctx):
@@ -177,7 +180,7 @@ class Executor(discord.Bot):
             
             self.state = State.MEETING
             self.meeting_time = self.meeting_length
-            await ctx.respond(f"@everyone The meeting has started! Crewmates have {self.game.meeting_timer} seconds to discuss!")
+            await ctx.respond(f"@everyone The meeting has started! Crewmates have {self.meeting_time} seconds to discuss!")
 
         @self.command(description="End the meeting")
         async def end_meeting(ctx):
@@ -186,14 +189,10 @@ class Executor(discord.Bot):
                 return
             
             self.state = State.IN_PROGRESS
-            await ctx.respond(f"@everyone The meeting has ended! Crewmates have {self.game.remaining_tasks} tasks left to finish with {self.game_time}s left!")
+            await ctx.respond(f"@everyone The meeting has ended! Crewmates have {self.remaining_tasks} tasks left to finish with {self.game_time}s left!")
         
         @self.command(description="End the game")
         async def end_game(ctx):
-            if self.state != State.IN_PROGRESS:
-                await ctx.respond("Error: Game not in progress!")
-                return
-            
             #reset game state
             self.players = set()
 
