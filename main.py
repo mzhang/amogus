@@ -82,7 +82,8 @@ class Executor(discord.Bot):
                 await self.channel.send(f"Crewmates have {self.game_time}s left to finish {self.remaining_tasks} tasks!")
             
             if self.game_time == 0:
-                await self.end_game()
+                self.end()
+                await self.channel.send("@everyone Game has finished!")
                 return
             
         elif self.state == State.MEETING:
@@ -92,7 +93,21 @@ class Executor(discord.Bot):
             if self.meeting_time == 0:
                 await self.channel.send("@everyone The meeting has ended! Vote out who you think is the imposter.")
                 return
+    def end(self):
+        #reset game state
+            self.players = set()
 
+            self.remaining_tasks = 0
+            self.game_time = 0
+            self.meeting_time = 0
+
+            self.imposter_count = 0
+            self.tasks_per_person = 0
+            self.meeting_length = 0
+            self.channel = None
+
+            self.state = State.INIT
+        
     def add_commands(self):
         @self.command()
         async def test(ctx): 
@@ -161,7 +176,9 @@ class Executor(discord.Bot):
             self.remaining_tasks -= 1
             if self.remaining_tasks == 0:
                 await ctx.respond(f"Crewmates have finished all their tasks!")
-                await self.end_game(ctx)
+                self.end()
+                await ctx.respond("@everyone Game has finished!")
+            
             await ctx.respond(f"{ctx.author.name} has finished a task! {ctx.author.name} wrote: \"{task_writeup}\". Crewmates have {self.remaining_tasks} tasks left to finish!")
         
         @self.command(description="Call an emergency meeting")
