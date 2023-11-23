@@ -29,6 +29,8 @@ class Executor(discord.Bot):
         self.remaining_tasks = 0
         self.game_time = 0
         self.meeting_time = 0
+        self.kill_start_countdown = 0
+        self.kill_start_countdown_cur = self.kill_start_countdown
 
         #game parameters
         self.imposter_count = 0
@@ -86,13 +88,23 @@ class Executor(discord.Bot):
                 await self.channel.send("@everyone Game has finished!")
                 return
             
+            self.kill_start_countdown_cur -= 1
+            if self.kill_start_countdown_cur == 0:
+                await self.channel.send("@everyone Imposters can now kill!")
+                return
+            
         elif self.state == State.MEETING:
             self.meeting_time -= 1
             print("meeting time:", self.meeting_time)
 
             if self.meeting_time == 0:
+                self.kill_start_countdown_cur = self.kill_start_countdown
                 await self.channel.send("@everyone The meeting has ended! Vote out who you think is the imposter.")
                 return
+            elif self.meeting_time % 20 == 0:
+                await self.channel.send(f"@everyone {self.meeting_time}s left in the meeting!")
+                return
+            
     def end(self):
         #reset game state
             self.players = set()
@@ -119,7 +131,9 @@ class Executor(discord.Bot):
                             imposter_count: int, 
                             tasks_per_person: discord.Option(int, default = 4, description="default 4"), 
                             game_length: discord.Option(int, default = 420, description="default 420s"), 
-                            meeting_length: discord.Option(int, default = 60, description="default 60s")):
+                            meeting_length: discord.Option(int, default = 60, description="default 60s"),
+                            kill_start_countdown: discord.Option(int, default = 10, description="default 10s")
+                        ):
             
             if self.state != State.INIT:
                 await ctx.respond("Error: Game already in progress!")
@@ -132,8 +146,10 @@ class Executor(discord.Bot):
             self.game_time = game_length
             self.meeting_length = meeting_length
             self.meeting_time = meeting_length
+            self.kill_start_countdown = kill_start_countdown
+            self.kill_start_countdown_cur = kill_start_countdown
             self.channel = ctx.channel
-            await ctx.respond(f"New game created with {tasks_to_win} tasks to win, {imposter_count} imposters! The game will last {game_length} seconds, and meetings will last {meeting_length} seconds!")
+            await ctx.respond(f"New game created with {tasks_to_win} tasks to win, {imposter_count} imposters! The game will last {game_length} seconds, and meetings will last {meeting_length} seconds! {kill_start_countdown} seconds before imposters can kill!")
         
         @self.command(description="Join the game")
         async def join(ctx):
@@ -224,7 +240,7 @@ class Executor(discord.Bot):
 
             self.state = State.INIT
 
-            await ctx.respond(f"@ everyone Game has ended! Please return to the meeting room!")
+            await ctx.respond(f"@everyone Game has ended! Please return to the meeting room!")
 
         @self.command(description="Get the rules of the game")
         async def rules(ctx):
