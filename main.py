@@ -101,7 +101,7 @@ class Executor(discord.Bot):
                 self.kill_start_countdown_cur = self.kill_start_countdown
                 await self.channel.send("@everyone The meeting has ended! Vote out who you think is the imposter.")
                 return
-            elif self.meeting_time % 20 == 0:
+            elif self.meeting_time % 20 == 0 and self.meeting_time > 0:
                 await self.channel.send(f"@everyone {self.meeting_time}s left in the meeting!")
                 return
             
